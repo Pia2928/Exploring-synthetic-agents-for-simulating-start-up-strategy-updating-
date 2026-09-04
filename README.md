@@ -1,4 +1,4 @@
-# Founder Cognition Lab (CLI)
+# Synthetic Founders
 
 A sandbox for exploring how synthetic founder agents interpret and react to
 early feedback — individually, in a group discussion, or in one-on-one chat.
