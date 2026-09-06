@@ -1,6 +1,6 @@
 """
 Simple JSON-file storage for agents and chat histories.
-No database needed — this keeps the project easy to clone and run anywhere.
+No database needed -- this keeps the project easy to clone and run anywhere.
 """
 
 import json
