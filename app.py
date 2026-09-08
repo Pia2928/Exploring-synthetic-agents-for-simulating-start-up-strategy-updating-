@@ -1,9 +1,16 @@
 """
 Founder Cognition Lab -- local web server.
 
-Serves a browser UI (templates/index.html + static/) and a small JSON API
-backed by agents.py / storage.py. The Anthropic API key stays server-side --
-the browser never sees it.
+Serves a browser UI (templates/index.html + static/) and a small JSON API,
+backed by four single-purpose modules (structured after the module split in
+Social-Simulations-for-Survey-based-Research):
+
+  agent_library.py   -- agent construction, reference tables, prompt assembly
+  agent_validator.py -- consistency checks before an agent gets saved
+  response_engine.py -- everything that calls the Anthropic API
+  storage.py          -- JSON-file persistence
+
+The Anthropic API key stays server-side -- the browser never sees it.
 
 Run: python app.py
 Then open: http://127.0.0.1:5000
@@ -15,7 +22,9 @@ import sys
 from flask import Flask, jsonify, render_template, request
 
 import storage
-import agents as agent_lib
+import agent_library
+import agent_validator
+import response_engine
 
 app = Flask(__name__)
 
@@ -41,8 +50,9 @@ def index():
 @app.route("/api/reference", methods=["GET"])
 def reference():
     return jsonify({
-        "alignment_strategies": agent_lib.ALIGNMENT_STRATEGIES,
-        "founder_identity_descriptions": agent_lib.FOUNDER_IDENTITY_DESCRIPTIONS,
+        "alignment_strategies": agent_library.ALIGNMENT_STRATEGIES,
+        "founder_identity_descriptions": agent_library.FOUNDER_IDENTITY_DESCRIPTIONS,
+        "construction_tiers": agent_library.CONSTRUCTION_TIERS,
     })
 
 
@@ -51,6 +61,8 @@ def reference():
 def _agent_payload_to_kwargs(data):
     return dict(
         name=data.get("name", "").strip(),
+        tier=data.get("tier", "trait"),
+        temperature=float(data.get("temperature", 0.7)),
         demographics={
             "age": data.get("age", ""),
             "gender": data.get("gender", ""),
@@ -78,6 +90,18 @@ def _agent_payload_to_kwargs(data):
     )
 
 
+@app.route("/api/agents/preview-prompt", methods=["POST"])
+def preview_prompt():
+    """Builds the system prompt from whatever is currently in the form,
+    WITHOUT saving anything. Lets you check exactly what an agent will see
+    before spending an API call on it."""
+    data = request.get_json(force=True)
+    kwargs = _agent_payload_to_kwargs(data)
+    temp_agent = agent_library.new_agent(**kwargs)
+    prompt = agent_library.build_system_prompt(temp_agent, include_memory=False)
+    return jsonify({"prompt": prompt})
+
+
 @app.route("/api/agents", methods=["GET"])
 def list_agents():
     return jsonify(storage.load_agents())
@@ -86,10 +110,15 @@ def list_agents():
 @app.route("/api/agents", methods=["POST"])
 def create_agent():
     data = request.get_json(force=True)
+
+    validation = agent_validator.validate_agent(data)
+    if validation["errors"]:
+        return jsonify({"error": " / ".join(validation["errors"])}), 400
+
     kwargs = _agent_payload_to_kwargs(data)
-    if not kwargs["name"]:
-        return jsonify({"error": "name is required"}), 400
-    agent = agent_lib.new_agent(**kwargs)
+    agent = agent_library.new_agent(**kwargs)
+    agent["validation_warnings"] = validation["warnings"]
+
     agents = storage.load_agents()
     agents.append(agent)
     storage.save_agents(agents)
@@ -99,11 +128,18 @@ def create_agent():
 @app.route("/api/agents/<agent_id>", methods=["PUT"])
 def update_agent(agent_id):
     data = request.get_json(force=True)
+
+    validation = agent_validator.validate_agent(data)
+    if validation["errors"]:
+        return jsonify({"error": " / ".join(validation["errors"])}), 400
+
     agents = storage.load_agents()
     for a in agents:
         if a["id"] == agent_id:
             kwargs = _agent_payload_to_kwargs(data)
             a["name"] = kwargs["name"] or a["name"]
+            a["tier"] = kwargs["tier"]
+            a["temperature"] = kwargs["temperature"]
             a["demographics"] = kwargs["demographics"]
             a["grounded"] = {
                 "background": kwargs["background"],
@@ -118,6 +154,7 @@ def update_agent(agent_id):
                 "dominance": kwargs["dominance"], "optimism": kwargs["optimism"],
                 "note": kwargs["note"],
             }
+            a["validation_warnings"] = validation["warnings"]
             storage.save_agents(agents)
             return jsonify(a)
     return jsonify({"error": "agent not found"}), 404
@@ -147,7 +184,7 @@ def extract_bio():
     if not bio:
         return jsonify({"error": "no bio text provided"}), 400
     try:
-        fields = agent_lib.extract_bio_fields(bio)
+        fields = response_engine.extract_bio_fields(bio)
         return jsonify(fields)
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": str(e)}), 500
@@ -168,11 +205,11 @@ def run_individual():
     results = []
     for a in selected:
         try:
-            reaction = agent_lib.react_individually(a, scenario)
+            reaction = response_engine.react_individually(a, scenario)
             results.append({"agent_id": a["id"], "name": a["name"], **reaction})
         except Exception as e:  # noqa: BLE001
             results.append({"agent_id": a["id"], "name": a["name"], "error": str(e)})
-    storage.save_agents(agents)  # persist updated memory streams
+    storage.save_agents(agents)
     return jsonify(results)
 
 
@@ -192,14 +229,14 @@ def run_group():
     for r in range(rounds):
         for a in selected:
             try:
-                reaction = agent_lib.react_in_group_turn(a, scenario, transcript)
+                reaction = response_engine.react_in_group_turn(a, scenario, transcript)
                 turn = {"agent_id": a["id"], "name": a["name"], "round": r + 1, **reaction}
             except Exception as e:  # noqa: BLE001
                 turn = {"agent_id": a["id"], "name": a["name"], "round": r + 1,
                         "reasoning": "", "stance": f"[error: {e}]"}
             transcript.append({"name": turn["name"], "stance": turn["stance"]})
             turns.append(turn)
-    storage.save_agents(agents)  # persist updated memory streams
+    storage.save_agents(agents)
     return jsonify(turns)
 
 
@@ -223,9 +260,9 @@ def post_chat(agent_id):
 
     history = storage.load_chat(agent_id)
     history.append({"role": "user", "content": message})
-    system = agent_lib.build_system_prompt(agent, include_memory=False, json_output=False)
+    system = agent_library.build_system_prompt(agent, include_memory=False, json_output=False)
     try:
-        reply = agent_lib.call_claude(system, history)
+        reply = response_engine.call_claude(system, history)
         history.append({"role": "assistant", "content": reply})
         storage.save_chat(agent_id, history)
         return jsonify({"reply": reply})
