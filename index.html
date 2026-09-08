@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Founder Cognition Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-title">
+    <h1>Founder Cognition Lab</h1>
+    <p>Synthetic founders grounded in alignment strategy, identity, demographics, and memory</p>
+  </div>
+</header>
+
+<nav class="topnav" id="topnav">
+  <button class="nav-btn active" data-page="build">Build Agent</button>
+  <button class="nav-btn" data-page="library">Agent Library</button>
+  <button class="nav-btn" data-page="chat">Chat with Agent</button>
+  <button class="nav-btn" data-page="individual">Individual Reaction Elicitation</button>
+  <button class="nav-btn" data-page="group">Group Interaction Elicitation</button>
+  <button class="nav-btn" data-page="guidance">Guidance</button>
+</nav>
+
+<main class="page-wrap">
+
+  <!-- ============ PAGE: Build Agent ============ -->
+  <section class="page" id="page-build">
+    <div class="build-columns">
+      <div class="build-form-col">
+
+        <div class="page-head-row">
+          <h2>Build a New Agent</h2>
+          <button class="btn btn-ghost" id="newAgentBtn">+ New Blank Agent</button>
+        </div>
+
+        <div class="panel-block">
+          <div class="panel-label">Construction tier</div>
+          <div class="panel-note">Tier 1 builds from trait scales. Tier 2 grounds the agent in real interview material, with the scales below becoming optional secondary scaffolding.</div>
+          <div class="strategy-options" id="tierOptions"></div>
+        </div>
+
+        <div class="panel-block bio-box">
+          <label>Optional: paste a bio to pre-fill grounded fields below</label>
+          <textarea id="bioPaste" placeholder="Paste raw bio / profile text…"></textarea>
+          <button class="btn btn-ghost" id="extractBioBtn">Extract grounded fields</button>
+          <span id="extractStatus" class="inline-status"></span>
+        </div>
+
+        <div class="panel-block">
+          <div class="field"><label for="f-name">Name (chosen manually)</label><input type="text" id="f-name" placeholder="e.g. Priya Nandan" /></div>
+        </div>
+
+        <div class="panel-block">
+          <div class="panel-label">Demographics</div>
+          <div class="panel-note">Baseline for every agent, so a roster doesn't default to one implicit "typical founder."</div>
+          <div class="field-row">
+            <div class="field"><label for="f-age">Age</label><input type="number" id="f-age" /></div>
+            <div class="field"><label for="f-gender">Gender</label><input type="text" id="f-gender" /></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="f-region">Region</label><input type="text" id="f-region" /></div>
+            <div class="field"><label for="f-education">Education</label><input type="text" id="f-education" /></div>
+          </div>
+          <div class="field"><label for="f-socioeconomic">Socioeconomic background</label><input type="text" id="f-socioeconomic" /></div>
+        </div>
+
+        <div class="panel-block">
+          <div class="panel-label" id="groundedLabel">Grounded facts</div>
+          <div class="panel-note" id="groundedNote" style="display:none;">Paste real interview transcript or notes here — this becomes the authoritative source of this agent's voice and reasoning.</div>
+          <div class="field"><label for="f-background" id="backgroundLabel">Background</label><textarea id="f-background"></textarea></div>
+          <div class="field"><label for="f-expertise">Domain expertise</label><input type="text" id="f-expertise" /></div>
+          <div class="field"><label for="f-outcomes">Prior outcomes</label><input type="text" id="f-outcomes" /></div>
+          <div class="field"><label for="f-values">Stated values / voice</label><textarea id="f-values"></textarea></div>
+        </div>
+
+        <div class="panel-block">
+          <div class="panel-label" id="strategyLabel">Alignment strategy</div>
+          <div class="panel-note" id="strategyNote">Each mitigates two of four uncertainty types and is structurally blind to the other two.</div>
+          <div class="strategy-options" id="strategyOptions"></div>
+        </div>
+
+        <div class="panel-block">
+          <div class="panel-label" id="identityLabel">Founder identity blend</div>
+          <div class="panel-note" id="identityNote">Real founders score on more than one — set all three.</div>
+          <div class="slider-row"><label>Missionary</label><input type="range" id="f-missionary" min="0" max="10" value="5" /><span class="val" id="f-missionary-val">5</span></div>
+          <div class="slider-row"><label>Darwinian</label><input type="range" id="f-darwinian" min="0" max="10" value="5" /><span class="val" id="f-darwinian-val">5</span></div>
+          <div class="slider-row"><label>Communitarian</label><input type="range" id="f-communitarian" min="0" max="10" value="5" /><span class="val" id="f-communitarian-val">5</span></div>
+        </div>
+
+        <div class="panel-block">
+          <div class="panel-label" id="dialsLabel">Assigned cognitive dials</div>
+          <div class="panel-note">Experimental variables you set — not psychology read off a resume.</div>
+          <div class="slider-row"><label>Risk tolerance</label><input type="range" id="f-risk" min="0" max="10" value="5" /><span class="val" id="f-risk-val">5</span></div>
+          <div class="slider-row"><label>Confirmation bias</label><input type="range" id="f-bias" min="0" max="10" value="5" /><span class="val" id="f-bias-val">5</span></div>
+          <div class="slider-row"><label>Group dominance</label><input type="range" id="f-dominance" min="0" max="10" value="5" /><span class="val" id="f-dominance-val">5</span></div>
+          <div class="slider-row"><label>Optimism</label><input type="range" id="f-optimism" min="0" max="10" value="5" /><span class="val" id="f-optimism-val">5</span></div>
+          <div class="field"><label for="f-note">Note (optional)</label><input type="text" id="f-note" /></div>
+        </div>
+
+        <div class="panel-block">
+          <div class="panel-label">Temperature</div>
+          <div class="panel-note">Low = consistent and predictable. High = more varied and unpredictable, even given an identical prompt.</div>
+          <div class="slider-row"><label>Temperature</label><input type="range" id="f-temperature" min="0" max="1" step="0.1" value="0.7" /><span class="val" id="f-temperature-val">0.7</span></div>
+        </div>
+
+        <div class="panel-block action-row">
+          <button class="btn btn-primary" id="saveAgentBtn">Save Agent</button>
+          <button class="btn btn-ghost" id="previewPromptBtn">Preview System Prompt</button>
+          <button class="btn btn-danger" id="deleteAgentBtn" style="display:none;">Delete</button>
+        </div>
+
+        <div class="panel-block collapsible" id="promptPreviewBlock" style="display:none;">
+          <div class="collapsible-head" id="promptPreviewToggle">
+            <span class="chevron">▾</span> Generated System Prompt
+          </div>
+          <pre class="prompt-preview" id="promptPreviewText"></pre>
+        </div>
+
+      </div>
+
+      <div class="build-preview-col">
+        <div class="json-preview-head">
+          <h3>Live JSON Preview</h3>
+          <p>Updates automatically as you fill in the form</p>
+        </div>
+        <pre class="json-preview" id="jsonPreview"></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGE: Agent Library ============ -->
+  <section class="page" id="page-library" style="display:none;">
+    <div class="page-head-row">
+      <h2>Agent Library</h2>
+      <button class="btn btn-ghost" id="libraryNewAgentBtn">+ New agent</button>
+    </div>
+    <div id="libraryGrid" class="library-grid"><p class="placeholder">No agents yet.</p></div>
+  </section>
+
+  <!-- ============ PAGE: Chat with Agent ============ -->
+  <section class="page" id="page-chat" style="display:none;">
+    <h2>Chat with an Agent</h2>
+    <div class="chat-head">
+      <select id="chatAgentSelect"><option value="">Select an agent…</option></select>
+      <button class="btn btn-ghost" id="clearChatBtn">Clear conversation</button>
+    </div>
+    <div class="chat-window" id="chatWindow"><p class="placeholder">Pick an agent to talk with them one-on-one, outside of any scenario.</p></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Say something…" disabled />
+      <button class="btn btn-chat" id="chatSendBtn" disabled>Send</button>
+    </div>
+  </section>
+
+  <!-- ============ PAGE: Individual Reaction Elicitation ============ -->
+  <section class="page" id="page-individual" style="display:none;">
+    <h2>Individual Reaction Elicitation</h2>
+    <p class="page-sub">Each selected agent reacts independently, with no visibility into the others' responses.</p>
+    <div class="stimulus">
+      <label for="individualScenarioInput">Feedback stimulus</label>
+      <textarea id="individualScenarioInput" placeholder="e.g. Your team just finished the first paid pilot demo. The client said the product 'solved a real problem' but flagged the pricing as 'a hard sell internally' and didn't commit to a renewal date."></textarea>
+      <span class="field-caption">Select agent(s)</span>
+      <div class="participant-picker" id="individualParticipantPicker"><span class="placeholder-small">Create an agent first.</span></div>
+    </div>
+    <div class="run-row">
+      <button class="btn btn-run-individual" id="runIndividualBtn">Run individual reactions</button>
+    </div>
+    <div id="individualOutput"><p class="placeholder">"Reasoning" is private; "Stance" is what they'd actually say or do.</p></div>
+  </section>
+
+  <!-- ============ PAGE: Group Interaction Elicitation ============ -->
+  <section class="page" id="page-group" style="display:none;">
+    <h2>Group Interaction Elicitation</h2>
+    <p class="page-sub">Agents take turns. Only public "stance" is visible to the rest of the group.</p>
+    <div class="stimulus">
+      <label for="groupScenarioInput">Feedback stimulus</label>
+      <textarea id="groupScenarioInput" placeholder="e.g. A potential enterprise customer said they love the product but their procurement team requires SOC 2 compliance before signing, which would take 4-6 months to obtain."></textarea>
+      <span class="field-caption">Select agent(s) — at least two</span>
+      <div class="participant-picker" id="groupParticipantPicker"><span class="placeholder-small">Create an agent first.</span></div>
+    </div>
+    <div class="run-row">
+      <button class="btn btn-run-group" id="runGroupBtn">Run group discussion</button>
+      <div class="rounds-input">
+        <label for="roundsInput">Rounds per agent</label>
+        <input type="number" id="roundsInput" min="1" max="4" value="2" />
+      </div>
+    </div>
+    <div id="groupOutput"><p class="placeholder">Click "private reasoning" on any turn to see what that agent actually thought.</p></div>
+  </section>
+
+  <!-- ============ PAGE: Guidance ============ -->
+  <section class="page" id="page-guidance" style="display:none;">
+    <h2>Guidance</h2>
+    <p class="page-sub">Reference material for you as the researcher — none of this is injected into any agent's prompt.</p>
+
+    <h3>Alignment strategies</h3>
+    <div id="guidanceStrategies"></div>
+
+    <h3>Founder identities</h3>
+    <div id="guidanceIdentities"></div>
+
+    <h3>Construction tiers</h3>
+    <div id="guidanceTiers"></div>
+
+    <h3>Presenting stimuli — research guidance</h3>
+    <ol class="guidance-list">
+      <li><b>Write stimuli the way real feedback actually sounds.</b> A customer, investor, or co-founder rarely gives clean, unambiguous feedback. Mixed, hedged, or contradictory signals are more diagnostic than a flat "the customer said no."</li>
+      <li><b>Vary one thing at a time when comparing agents.</b> If you want to isolate the effect of alignment strategy, hold founder identity, demographics, and temperature constant across the agents you're comparing, and change only the strategy.</li>
+      <li><b>Run Individual before Group when possible.</b> Individual reactions establish each agent's unmediated baseline, so you can later see how much a stance shifted due to social context rather than the agent's own reasoning.</li>
+      <li><b>Do not tell the agent it is being tested or simulated.</b> An agent that knows it's being benchmarked tends to produce more careful, less naturalistic answers — the universal instructions already avoid this, keep your stimuli consistent with it.</li>
+      <li><b>Use repeated runs for anything you plan to generalise from.</b> A single reaction from a single agent is one data point, not a pattern. Rerunning the same stimulus (particularly with varied temperature) shows the spread of plausible reactions.</li>
+      <li><b>Keep some stimuli deliberately ambiguous.</b> A stimulus with one obvious correct reading tells you little about how an agent actually reasons under uncertainty.</li>
+    </ol>
+  </section>
+
+</main>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
