@@ -1,7 +1,8 @@
 """
 Founder Cognition Lab -- CLI version.
 
-Same backend as app.py (agents.py / storage.py), no browser needed.
+Same backend as app.py, split across agent_library.py / agent_validator.py /
+response_engine.py / storage.py. No browser needed.
 Run: python main.py
 """
 
@@ -9,7 +10,9 @@ import os
 import sys
 
 import storage
-import agents as agent_lib
+import agent_library
+import agent_validator
+import response_engine
 
 
 def check_api_key():
@@ -63,7 +66,7 @@ def pick_agent(agents, prompt_text="Pick an agent"):
         print("No agents yet. Add one first.")
         return None
     for i, a in enumerate(agents):
-        strat = agent_lib.ALIGNMENT_STRATEGIES[a["alignment_strategy"]]["label"]
+        strat = agent_library.ALIGNMENT_STRATEGIES[a["alignment_strategy"]]["label"]
         print(f"  {i + 1}. {a['name']}  [{strat}]")
     raw = input(f"{prompt_text} (number, or blank to cancel): ").strip()
     if not raw:
@@ -115,7 +118,7 @@ def add_agent(agents):
         if bio_text:
             print("Extracting...")
             try:
-                fields = agent_lib.extract_bio_fields(bio_text)
+                fields = response_engine.extract_bio_fields(bio_text)
                 background, expertise = fields.get("background", ""), fields.get("expertise", "")
                 outcomes, values = fields.get("outcomes", ""), fields.get("values", "")
                 print("Extracted. Demographics, strategy, identity, and traits are still yours to set.\n")
@@ -140,7 +143,7 @@ def add_agent(agents):
     values = prompt("Stated values / voice", values)
 
     print("\nAlignment strategy (Zellweger & Djokovic):")
-    strategy = prompt_choice("Choose", agent_lib.ALIGNMENT_STRATEGIES, "visionary")
+    strategy = prompt_choice("Choose", agent_library.ALIGNMENT_STRATEGIES, "visionary")
 
     print("\nFounder identity blend (0-10 each -- real founders score on more than one):")
     missionary = prompt_int("  Missionary")
@@ -154,7 +157,20 @@ def add_agent(agents):
     optimism = prompt_int("  Optimism")
     note = prompt("  Note (optional)")
 
-    agent = agent_lib.new_agent(
+    validation = agent_validator.validate_agent({
+        "name": name, "age": age, "alignment_strategy": strategy, "expertise": expertise,
+        "missionary": missionary, "darwinian": darwinian, "communitarian": communitarian,
+        "risk": risk, "bias": bias, "dominance": dominance, "optimism": optimism,
+    })
+    if validation["errors"]:
+        print("\nCan't save this agent:")
+        for e in validation["errors"]:
+            print(f"  - {e}")
+        return
+    for w in validation["warnings"]:
+        print(f"  [note] {w}")
+
+    agent = agent_library.new_agent(
         name=name,
         demographics={"age": age, "gender": gender, "region": region,
                       "education_level": education, "socioeconomic_background": socioeconomic},
@@ -184,7 +200,7 @@ def list_agents(agents):
         return
     print("\n--- Roster ---")
     for a in agents:
-        strat = agent_lib.ALIGNMENT_STRATEGIES[a["alignment_strategy"]]["label"]
+        strat = agent_library.ALIGNMENT_STRATEGIES[a["alignment_strategy"]]["label"]
         fi = a["founder_identity"]
         d = a["demographics"]
         asn = a["assigned"]
@@ -223,7 +239,7 @@ def run_individual(agents):
     for agent in selected:
         print(f"--- {agent['name']} ---")
         try:
-            result = agent_lib.react_individually(agent, scenario)
+            result = response_engine.react_individually(agent, scenario)
             print(f"  Reasoning (private): {result['reasoning']}")
             print(f"  Stance: {result['stance']}")
         except Exception as e:
@@ -253,7 +269,7 @@ def run_group(agents):
         print(f"== Round {r + 1} ==")
         for agent in selected:
             try:
-                result = agent_lib.react_in_group_turn(agent, scenario, transcript)
+                result = response_engine.react_in_group_turn(agent, scenario, transcript)
                 transcript.append({"name": agent["name"], "stance": result["stance"]})
                 print(f"{agent['name']}: {result['stance']}")
                 print(f"   (private reasoning: {result['reasoning']})\n")
@@ -268,7 +284,7 @@ def chat_with_agent(agents):
         return
     history = storage.load_chat(agent["id"])
     print(f"\nChatting with {agent['name']}. Type 'exit' to leave, 'clear' to reset.\n")
-    system = agent_lib.build_system_prompt(agent, include_memory=False, json_output=False)
+    system = agent_library.build_system_prompt(agent, include_memory=False, json_output=False)
 
     for m in history:
         speaker = "you" if m["role"] == "user" else agent["name"]
@@ -287,7 +303,7 @@ def chat_with_agent(agents):
             continue
         history.append({"role": "user", "content": msg})
         try:
-            reply = agent_lib.call_claude(system, history)
+            reply = response_engine.call_claude(system, history)
             history.append({"role": "assistant", "content": reply})
             storage.save_chat(agent["id"], history)
             print(f"{agent['name']}: {reply}")
